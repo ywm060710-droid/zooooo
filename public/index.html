@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>尤尤的動物樂園 🦊</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="theme-color" content="#fff3e2">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦊</text></svg>">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦊</text></svg>">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="meadow"></div>
+
+  <div id="app">
+    <!-- 頂欄 -->
+    <div id="topbar" class="hidden">
+      <div class="logo">🦊 尤尤的動物樂園</div>
+      <div id="statChips">
+        <span class="chip">⭐ <span class="num" id="chipPoints">0</span></span>
+        <span class="chip">📖 <span class="num" id="chipChars">0</span> 字</span>
+        <span class="chip">🐾 <span class="num" id="chipFriends">0</span></span>
+        <span class="chip"><span id="syncDot" title="雲端同步狀態"></span></span>
+      </div>
+    </div>
+
+    <!-- 登入 -->
+    <div id="loginView">
+      <img class="mascotBig" src="img/fox.png" alt="小狐狸橙橙">
+      <h1>尤尤的動物樂園</h1>
+      <p class="dim" style="margin:8px 0 22px">小狐狸橙橙在等你——輸入家庭代碼，開園啦！</p>
+      <div class="card">
+        <input type="password" id="codeInput" placeholder="家庭代碼" autocomplete="current-password">
+        <button class="btn block" id="loginBtn" style="margin-top:12px">進入樂園</button>
+        <p id="loginMsg" class="small" style="margin-top:10px;color:var(--red)"></p>
+      </div>
+      <p class="small dim">進度會自動儲存到雲端，換裝置照樣繼續。</p>
+    </div>
+
+    <!-- 主視圖容器 -->
+    <div id="viewChapters" class="mainView hidden"></div>
+    <div id="viewChapterDetail" class="mainView hidden"></div>
+    <div id="viewZoo" class="mainView hidden"></div>
+    <div id="viewDex" class="mainView hidden"></div>
+    <div id="viewRewards" class="mainView hidden"></div>
+    <div id="viewParent" class="mainView hidden"></div>
+  </div>
+
+  <!-- 底部導航 -->
+  <nav id="nav" class="hidden">
+    <button data-view="chapters"><span>📚</span>章節</button>
+    <button data-view="zoo"><span>🦊</span>動物園</button>
+    <button data-view="dex"><span>📖</span>圖鑑</button>
+    <button data-view="rewards"><span>🎁</span>獎勵</button>
+    <button data-view="parent"><span>📊</span>報告</button>
+  </nav>
+
+  <!-- 完成章節／慶祝 覆蓋層 -->
+  <div id="doneOverlay" class="overlay hidden"></div>
+  <!-- 探索遭遇 覆蓋層 -->
+  <div id="encOverlay" class="overlay hidden"></div>
+
+  <div id="toast"></div>
+
+  <script src="js/hanzi-writer.min.js"></script>
+  <script src="js/strokes.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
