@@ -82,11 +82,13 @@ function chState(id) {
       traced: [],
       dictated: [],
       sentAnswered: [],
+      rebuildDone: [],
       freeWriting: [],
       freeDone: false,
       completed: false
     };
   }
+  if (!state.chapters[id].rebuildDone) state.chapters[id].rebuildDone = [];
   return state.chapters[id];
 }
 function migrate(s) {
@@ -225,6 +227,7 @@ var currentView = "chapters";
 function showView(name) {
   stopSpeech();
   stopWander();
+  if (window.Zoo3D) Zoo3D.stop();
   currentView = name;
   var views = document.querySelectorAll(".mainView");
   for (var i = 0; i < views.length; i++) views[i].classList.add("hidden");
@@ -296,6 +299,15 @@ $("loginBtn").addEventListener("click", function () {
     $("loginBtn").disabled = false;
     $("loginMsg").textContent = "無法連接伺服器，請檢查網絡。";
   });
+});
+var demoLink = $("demoLink");
+if (demoLink) demoLink.addEventListener("click", function (e) {
+  e.preventDefault();
+  famCode = "demo-offline";
+  myRole = "preview";   // 試玩＝預覽模式：全功能開放，進度只存此裝置
+  localStorage.setItem("famCode", famCode);
+  localStorage.setItem("famRole", myRole);
+  loadStateThenEnter();
 });
 function loadStateThenEnter() {
   setSync("busy");
@@ -1008,6 +1020,7 @@ function renderSentenceStep(body) {
     });
     html += '</div><div class="explain hidden" id="sexp' + qi + '">💡 ' + esc(q.explain) + '</div></div>';
   });
+  if (c.sentence.rebuild && c.sentence.rebuild.length) html += '<div id="rbMount"></div>';
   html += '<div class="card"><h3>✍️ 自由寫作</h3>' +
     '<p>' + esc(c.sentence.free.prompt) + '</p>' +
     '<p class="small dim" style="white-space:pre-wrap">' + esc(c.sentence.free.example) + '</p>' +
@@ -1015,6 +1028,7 @@ function renderSentenceStep(body) {
     '<button class="btn amber block" id="freeSubmit" style="margin-top:10px">送交批改（+' + SC.freeSubmit + '分）</button>' +
     '<div id="freeList" style="margin-top:12px"></div></div>';
   body.innerHTML = html;
+  if (c.sentence.rebuild && c.sentence.rebuild.length) renderRebuild(c, s);
   s.sentAnswered.forEach(function (rec) { paintS(rec.q, rec.o, c.sentence.objective[rec.q].answer); });
   body.querySelectorAll(".sOpt").forEach(function (btn) {
     btn.addEventListener("click", function () {
@@ -1058,6 +1072,108 @@ function renderSentenceStep(body) {
       return '<div style="border-bottom:1px dashed var(--line);padding:8px 0;white-space:pre-wrap">' + esc(f.text) + '<div class="small">' + status + '</div></div>';
     }).join("");
   }
+}
+
+/* ----- 重組句子（砌詞語卡，玩法參考「重組句子大冒險」） ----- */
+var rb = { i: 0, placed: [] };
+function renderRebuild(c, s) {
+  var mount = $("rbMount");
+  if (!mount) return;
+  var list = c.sentence.rebuild;
+  if (rb.i >= list.length) rb.i = 0;
+  var r = list[rb.i];
+  rb.placed = [];
+  mount.innerHTML = '<div class="card"><h3>🧩 重組句子（' + s.rebuildDone.length + '/' + list.length + '）</h3>' +
+    '<p class="small dim">像拼拼圖一樣，按次序點詞語卡，砌出通順的句子。每句首次砌對 +' + SC.perRebuild + '⭐。</p>' +
+    '<div class="charTabs" id="rbTabs">' + list.map(function (x, i) {
+      var done = s.rebuildDone.indexOf(i) >= 0;
+      return '<button class="charTab' + (i === rb.i ? " now" : "") + (done ? " done" : "") + '" data-i="' + i + '" style="width:auto;min-width:44px">' + (done ? "★" : (i + 1)) + '</button>';
+    }).join("") + '</div>' +
+    '<p class="small" style="margin-bottom:8px"><b>' + esc(r.instruct) + '</b></p>' +
+    '<div class="rbLabel">🧩 詞語卡</div>' +
+    '<div class="rbPool" id="rbPool"></div>' +
+    '<div class="rbLabel">📝 我砌的句子（點卡可取回）</div>' +
+    '<div class="rbAnswer" id="rbAnswer"></div>' +
+    '<div class="row" style="margin-top:10px">' +
+    '<button class="btn green small" id="rbCheck">✓ 檢查答案</button>' +
+    '<button class="btn secondary small" id="rbClear">↺ 清除</button>' +
+    '<button class="btn amber small" id="rbHint">💡 提示</button>' +
+    '</div>' +
+    '<div class="rbHintBox hidden" id="rbHintBox"></div>' +
+    '<div class="rbFeedback hidden" id="rbFeedback"></div></div>';
+  mount.querySelectorAll("#rbTabs .charTab").forEach(function (b) {
+    b.addEventListener("click", function () {
+      rb.i = parseInt(b.getAttribute("data-i"), 10);
+      renderRebuild(c, s);
+    });
+  });
+  function paint() {
+    var pool = $("rbPool"), ans = $("rbAnswer");
+    pool.innerHTML = "";
+    r.cards.forEach(function (w, idx) {
+      var num = idx + 1;
+      var el = document.createElement("button");
+      el.className = "rbCard" + (rb.placed.indexOf(num) >= 0 ? " used" : "");
+      el.innerHTML = '<span class="num">' + num + '</span>' + esc(w);
+      el.addEventListener("click", function () {
+        if (rb.placed.indexOf(num) >= 0) return;
+        rb.placed.push(num);
+        paint();
+      });
+      pool.appendChild(el);
+    });
+    ans.innerHTML = "";
+    rb.placed.forEach(function (num) {
+      var el = document.createElement("button");
+      el.className = "rbCard";
+      el.innerHTML = '<span class="num">' + num + '</span>' + esc(r.cards[num - 1]);
+      el.addEventListener("click", function () {
+        rb.placed = rb.placed.filter(function (x) { return x !== num; });
+        paint();
+      });
+      ans.appendChild(el);
+    });
+  }
+  paint();
+  $("rbClear").addEventListener("click", function () {
+    rb.placed = [];
+    $("rbFeedback").className = "rbFeedback hidden";
+    paint();
+  });
+  $("rbHint").addEventListener("click", function () {
+    var hb = $("rbHintBox");
+    hb.textContent = "💡 " + r.hint;
+    hb.classList.remove("hidden");
+  });
+  $("rbCheck").addEventListener("click", function () {
+    var fb = $("rbFeedback");
+    if (!rb.placed.length) {
+      fb.className = "rbFeedback bad";
+      fb.textContent = "還沒有放詞語卡呢，先點上面的卡片砌句子吧！";
+      return;
+    }
+    var correct = rb.placed.length === r.order.length &&
+      rb.placed.every(function (n, i) { return n === r.order[i]; });
+    if (correct) {
+      var first = s.rebuildDone.indexOf(rb.i) < 0;
+      if (first) {
+        s.rebuildDone.push(rb.i);
+        addPoints(SC.perRebuild);
+        markDirty();
+      }
+      fb.className = "rbFeedback good";
+      fb.innerHTML = '🎉 太棒了！完全正確！' + (first ? " +" + SC.perRebuild + "⭐" : "（之前已砌對）") +
+        ' <button class="btn secondary small" id="rbSpeak">🔊 聽句子</button>';
+      $("rbSpeak").addEventListener("click", function () { stopSpeech(); speak(r.sentence); });
+      if (s.rebuildDone.length >= list.length) {
+        setTimeout(function () { toast("🏆 本章重組句子全部完成！"); }, 600);
+      }
+      setTimeout(function () { renderRebuild(c, s); }, 1600);
+    } else {
+      fb.className = "rbFeedback bad";
+      fb.innerHTML = "再試試看！次序還有點亂喔～<div class='small' style='margin-top:6px'>✅ 正確答案：" + esc(r.sentence) + "</div>";
+    }
+  });
 }
 
 /* ----- 完成本章 ----- */
@@ -1107,7 +1223,9 @@ var FOX_TIPS = [
   "朋友遇到困難時，用你學過的知識幫幫牠吧！",
   "在「建設」放置花草樹木，動物朋友住得更開心！",
   "拆走物品會全數退回 ⭐，放心試着佈置吧！",
-  "圖鑑裏收藏了每位朋友的小檔案，記得翻翻看！"
+  "圖鑑裏收藏了每位朋友的小檔案，記得翻翻看！",
+  "3D 樂園裏，用左下角搖桿帶我四處走；走近動物，按「互動」就可以找牠！",
+  "頭上有 ❗ 的朋友需要幫忙，頭上有 ？ 的是還未認識的新朋友！"
 ];
 
 function zoneUnlocked(z) {
@@ -1125,11 +1243,85 @@ function chapterTitle(id) {
   return c ? c.title : id;
 }
 
+var zooView = localStorage.getItem("zooView") || "3d";   // "3d" | "2d"
+
+function questText() {
+  var i, a, z;
+  // 1. 有動物需要幫忙（友誼夠、事件未解決）
+  for (i = 0; i < DATA.animals.length; i++) {
+    a = DATA.animals[i];
+    if (a.event && !state.eventDone[a.id] && (state.friendship[a.id] || 0) >= 2 && zoneUnlocked(zoneById(a.zone))) {
+      return "🆘 " + a.name + "需要幫忙！去" + zoneById(a.zone).name + "找牠吧。";
+    }
+  }
+  // 2. 還有未認識的朋友
+  for (i = 0; i < DATA.animals.length; i++) {
+    a = DATA.animals[i];
+    if (!(state.friendship[a.id] > 0) && zoneUnlocked(zoneById(a.zone))) {
+      return "🐾 去" + zoneById(a.zone).name + "認識新朋友吧！";
+    }
+  }
+  // 3. 還有地區未解鎖
+  for (i = 0; i < DATA.zones.length; i++) {
+    z = DATA.zones[i];
+    if (!zoneUnlocked(z)) return "📚 完成《" + chapterTitle(z.need) + "》，就可以解鎖" + z.name + "！";
+  }
+  return "🏡 把動物園建設得更漂亮，招待入住的朋友吧！";
+}
+
+function zooHooks3D() {
+  return {
+    data: DATA,
+    getState: function () { return state; },
+    zoneUnlocked: zoneUnlocked,
+    itemUnlocked: itemUnlocked,
+    chapterTitle: chapterTitle,
+    questText: questText,
+    toast: toast,
+    exploreCost: function () { return isPreview() ? 0 : SC.exploreCost; },
+    onExplore: function (zoneId) { exploreZone(zoneId || "pet"); },
+    onMeet: function (a) {
+      var cost = isPreview() ? 0 : SC.exploreCost;
+      if (state.points < cost) { toast("⭐ 不夠了！去完成章節或練字賺分吧"); return; }
+      if (cost) { spendPoints(cost); updateChips(); }
+      state.encCount = (state.encCount || 0) + 1;
+      markDirty();
+      runEncounter(a.zone, a.id);
+    },
+    onPlace: placeTileAt,
+    onRemove: removeTileAt
+  };
+}
+
 function renderZoo() {
   var v = $("viewZoo");
-  var html =
-    '<div class="zooFox"><img src="img/fox.png" alt="橙橙">' +
-    '<div class="bubble"><b>橙橙：</b>' + esc(pick(FOX_TIPS)) + '</div></div>' +
+  var can3d = !!(window.Zoo3D && Zoo3D.supported());
+  if (!can3d) zooView = "2d";
+  var head = '<div class="zooFox"><img src="img/fox.png" alt="橙橙">' +
+    '<div class="bubble"><b>橙橙：</b>' + esc(pick(FOX_TIPS)) + '</div></div>';
+  var viewTabs = '<div class="zooTabs">';
+  if (can3d) viewTabs += '<button class="btn small ' + (zooView === "3d" ? "" : "secondary") + '" data-zv="3d">🌍 3D 樂園</button>';
+  viewTabs += '<button class="btn small ' + (zooView === "2d" ? "" : "secondary") + '" data-zv="2d">🗺️ 2D 模式</button></div>';
+
+  if (zooView === "3d" && can3d) {
+    stopWander();
+    v.innerHTML = head + viewTabs + '<div id="zoo3dWrap"></div>';
+    v.querySelectorAll("[data-zv]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        zooView = b.getAttribute("data-zv");
+        localStorage.setItem("zooView", zooView);
+        renderZoo();
+      });
+    });
+    Zoo3D.mount($("zoo3dWrap"), zooHooks3D());
+    Zoo3D.refresh();
+    Zoo3D.start();
+    return;
+  }
+
+  /* ---- 2D 模式 ---- */
+  if (window.Zoo3D) Zoo3D.stop();
+  var html = head + viewTabs +
     '<div class="zooTabs">' +
     '<button class="btn small ' + (zooTab === "explore" ? "" : "secondary") + '" data-t="explore">🧭 探索（' + SC.exploreCost + '⭐/次）</button>' +
     '<button class="btn small ' + (zooTab === "build" ? "" : "secondary") + '" data-t="build">🏗️ 建設</button>' +
@@ -1141,6 +1333,13 @@ function renderZoo() {
     '<p class="small dim center" style="margin-top:8px">🐾 已入住朋友：<b id="resCount">' + state.residents.length + '</b> 位</p>' +
     '</div>';
   v.innerHTML = html;
+  v.querySelectorAll("[data-zv]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      zooView = b.getAttribute("data-zv");
+      localStorage.setItem("zooView", zooView);
+      renderZoo();
+    });
+  });
   v.querySelectorAll(".zooTabs [data-t]").forEach(function (b) {
     b.addEventListener("click", function () { zooTab = b.getAttribute("data-t"); renderZoo(); });
   });
@@ -1235,26 +1434,39 @@ function renderZooMap() {
   });
   drawResidents(true);
 }
+function placeTileAt(key, itemId) {
+  if (!itemId || state.zoo.tiles[key]) return false;
+  var item = itemById(itemId);
+  if (!item) return false;
+  if (state.points < item.cost) { toast("⭐ 不夠買 " + item.name + "！"); return false; }
+  spendPoints(item.cost);
+  state.zoo.tiles[key] = item.id;
+  markDirty();
+  updateChips();
+  return true;
+}
+function removeTileAt(key) {
+  var itId = state.zoo.tiles[key];
+  if (!itId) return false;
+  var it = itemById(itId);
+  delete state.zoo.tiles[key];
+  state.points += it.cost; // 退款：唔計入累計賺取
+  toast("♻️ 已拆走，退回 " + it.cost + "⭐");
+  markDirty();
+  updateChips();
+  return true;
+}
 function tileTap(key) {
   var itId = state.zoo.tiles[key];
   if (itId) {
     var it = itemById(itId);
     if (!confirm("拆走 " + it.emoji + " " + it.name + "？會退回 " + it.cost + "⭐")) return;
-    delete state.zoo.tiles[key];
-    state.points += it.cost; // 退款：唔計入累計賺取
-    toast("♻️ 已拆走，退回 " + it.cost + "⭐");
-    markDirty();
+    removeTileAt(key);
     renderZooMap();
     return;
   }
   if (zooTab !== "build" || !selItem) return;
-  var item = itemById(selItem);
-  if (state.points < item.cost) { toast("⭐ 不夠買 " + item.name + "！"); return; }
-  spendPoints(item.cost);
-  state.zoo.tiles[key] = item.id;
-  markDirty();
-  updateChips();
-  renderZooMap();
+  if (placeTileAt(key, selItem)) renderZooMap();
 }
 
 /* ---- 居民漫步 ---- */
@@ -1316,10 +1528,15 @@ function hearts(n) {
   for (var i = 0; i < 5; i++) s += i < n ? "❤️" : "🤍";
   return s;
 }
-function runEncounter(zoneId) {
-  var pool = DATA.animals.filter(function (a) { return a.zone === zoneId; });
-  var unseen = pool.filter(function (a) { return !(state.friendship[a.id] > 0); });
-  var a = (unseen.length && Math.random() < 0.65) ? pick(unseen) : pick(pool);
+function runEncounter(zoneId, forceId) {
+  var a;
+  if (forceId) {
+    a = animalById(forceId);
+  } else {
+    var pool = DATA.animals.filter(function (x) { return x.zone === zoneId; });
+    var unseen = pool.filter(function (x) { return !(state.friendship[x.id] > 0); });
+    a = (unseen.length && Math.random() < 0.65) ? pick(unseen) : pick(pool);
+  }
   var firstMeet = !(state.friendship[a.id] > 0);
   state.friendship[a.id] = Math.min(5, (state.friendship[a.id] || 0) + 1);
   var becameResident = false;
