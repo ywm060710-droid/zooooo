@@ -384,16 +384,13 @@ function chapterList(type) {
   return DATA.chapters.filter(function (c) { return c.type === type; });
 }
 function chapterUnlocked(c) {
-  if (isPreview() || state.unlockAll) return true;
-  var list = chapterList(c.type);
-  var idx = list.indexOf(c);
-  if (idx <= 0) return true;
-  var prev = list[idx - 1];
-  return !!(state.chapters[prev.id] && state.chapters[prev.id].completed);
+  // v2.1：全部章節常開，小朋友可自由挑選喜歡的文章溫習；
+  // 地區與建設物品仍靠完成章節解鎖，保留遊戲目標。
+  return true;
 }
 function renderChapters() {
   var v = $("viewChapters");
-  var html = '<h2>📚 學習章節</h2><p class="dim small" style="margin-bottom:6px">完成章節賺 ⭐，就可以去動物園探索建設！</p>';
+  var html = '<h2>📚 學習章節</h2><p class="dim small" style="margin-bottom:6px">全部文章已開放，自由挑選喜歡的溫習吧！完成章節賺 ⭐，就可以去動物園探索建設！</p>';
   function cardHtml(c) {
     var unlocked = chapterUnlocked(c);
     var s = state.chapters[c.id];
@@ -1943,7 +1940,7 @@ function renderReport(body) {
 function renderSettings(body) {
   body.innerHTML =
     '<div class="card"><h3>解鎖設定</h3>' +
-    '<label><input type="checkbox" id="unlockAll"' + (state.unlockAll ? " checked" : "") + '> 解鎖全部章節與地區（自由溫習）</label></div>' +
+    '<label><input type="checkbox" id="unlockAll"' + (state.unlockAll ? " checked" : "") + '> 解鎖全部地區與建設物品（章節本身已全面開放，可自由溫習）</label></div>' +
     '<div class="card"><h3>更改密碼</h3>' +
     '<input type="password" id="newPin" placeholder="新密碼（4位或以上）" style="margin:8px 0">' +
     '<button class="btn small" id="pinSave">更改密碼</button></div>' +
@@ -1957,7 +1954,7 @@ function renderSettings(body) {
   $("unlockAll").addEventListener("change", function () {
     state.unlockAll = $("unlockAll").checked;
     markDirty();
-    toast(state.unlockAll ? "已解鎖全部章節與地區" : "已恢復順序解鎖");
+    toast(state.unlockAll ? "已解鎖全部地區與建設物品" : "已恢復按章節進度解鎖地區");
   });
   $("pinSave").addEventListener("click", function () {
     var p = $("newPin").value.trim();
